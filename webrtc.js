@@ -1,3 +1,7 @@
+// Build Number: 1.0.0
+// --- Additional Information ---
+// This is a placeholder for the build number.
+
 // webrtc.js - Modular WebRTC LAN Demo
 
 // --- UI Elements ---
@@ -17,6 +21,9 @@ const answerBtn = document.getElementById('answerBtn');
 const cameraStatus = document.getElementById('cameraStatus');
 const connectionStatus = document.getElementById('connectionStatus');
 const iceStatus = document.getElementById('iceStatus');
+const messageInput = document.getElementById('messageInput');
+const sendMessageBtn = document.getElementById('sendMessageBtn');
+const messagesContainer = document.getElementById('messagesContainer');
 
 // --- State ---
 let localStream = null;
@@ -24,6 +31,7 @@ let remoteStream = null;
 let peerConnection = null;
 let isAudioMuted = false;
 let isVideoDisabled = false;
+let dataChannel; // Declare dataChannel in a broader scope
 
 // --- WebRTC Config ---
 const configuration = {
@@ -42,6 +50,7 @@ videoBtn.addEventListener('click', toggleVideo);
 copyOfferBtn.addEventListener('click', copyOffer);
 setAnswerBtn.addEventListener('click', setAnswer);
 answerBtn.addEventListener('click', answerCall);
+sendMessageBtn.addEventListener('click', sendMessage);
 
 // --- UI Functions ---
 function updateStatus(elementId, status) {
@@ -60,6 +69,8 @@ function updateConnectionStatus() {
     switch (state) {
         case 'connected':
             updateStatus('connectionStatus', 'connected');
+            messageInput.disabled = false; // Enable chat input
+            sendMessageBtn.disabled = false; // Enable send button
             break;
         case 'connecting':
         case 'new':
@@ -85,6 +96,14 @@ function updateIceStatus() {
         default:
             updateStatus('iceStatus', 'disconnected');
     }
+}
+
+function addMessageToChat(message, isLocal = false) {
+    const messageElement = document.createElement('div');
+    messageElement.className = isLocal ? 'message local' : 'message remote';
+    messageElement.textContent = message;
+    messagesContainer.appendChild(messageElement);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
 // --- Camera & Media ---
@@ -146,6 +165,19 @@ function createPeerConnection() {
     };
     peerConnection.onconnectionstatechange = updateConnectionStatus;
     peerConnection.oniceconnectionstatechange = updateIceStatus;
+
+    // Create a data channel for messaging
+    dataChannel = peerConnection.createDataChannel("chat");
+
+    dataChannel.onopen = () => {
+        messageInput.disabled = false; // Enable chat input
+        sendMessageBtn.disabled = false; // Enable send button
+    };
+
+    dataChannel.onmessage = (event) => {
+        addMessageToChat(event.data); // Display incoming messages
+    };
+
     updateStatus('connectionStatus', 'connecting');
 }
 
@@ -273,9 +305,23 @@ async function copyOffer() {
     }
 }
 
+function sendMessage() {
+    const message = messageInput.value.trim();
+    if (message !== '' && peerConnection) {
+        // Send message to the other peer
+        dataChannel.send(message); // Use the data channel to send the message
+        addMessageToChat(message, true); // Display the message in the chat
+        messageInput.value = '';
+    }
+}
+
 // --- Init Status ---
 updateStatus('cameraStatus', 'disconnected');
 updateStatus('connectionStatus', 'disconnected');
 updateStatus('iceStatus', 'disconnected');
+
+// Display the build number on the frontend
+const buildNumber = document.querySelector('meta[name="build-number"]').content;
+document.getElementById('buildNumberDisplay').innerText = 'Build Number: ' + buildNumber;
 
 console.log('WebRTC Modular LAN Demo loaded');

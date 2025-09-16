@@ -1,0 +1,27 @@
+/* Light mode overrides (since dark is now default) */
+:root.light-mode {
+  --primary-bg: #ffffff;
+  --primary-text: #222222;
+  --secondary-bg: #f0f0f0;
+  --accent: #0078d7;
+}
+
+body.light-mode {
+  background: var(--primary-bg);
+  color: var(--primary-text);
+}
+
+.header.light-mode, .footer.light-mode {
+  background: var(--secondary-bg);
+}
+
+.button.light-mode {
+  background: var(--accent);
+  color: #fff;
+}
+
+.button.light-mode:hover {
+  background: #005fa3;
+}
+
+/* Add more light mode overrides as needed */
