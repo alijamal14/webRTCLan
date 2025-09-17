@@ -4,7 +4,10 @@
 
 // webrtc.js - Modular WebRTC LAN Demo
 
-// --- UI Elements ---
+// WebRTC P2P Demo - Updated 2025-09-17
+// Fixed messagesContainer references to use chatMessages
+
+// --- DOM Elements ---
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const startBtn = document.getElementById('startBtn');
@@ -16,6 +19,10 @@ const offerText = document.getElementById('offerText');
 const answerText = document.getElementById('answerText');
 const offerInput = document.getElementById('offerInput');
 const copyOfferBtn = document.getElementById('copyOfferBtn');
+const copyAnswerBtn = document.getElementById('copyAnswerBtn');
+const copyOfferInputBtn = document.getElementById('copyOfferInputBtn');
+const pasteAnswerBtn = document.getElementById('pasteAnswerBtn');
+const pasteOfferInputBtn = document.getElementById('pasteOfferInputBtn');
 const setAnswerBtn = document.getElementById('setAnswerBtn');
 const answerBtn = document.getElementById('answerBtn');
 const cameraStatus = document.getElementById('cameraStatus');
@@ -23,7 +30,18 @@ const connectionStatus = document.getElementById('connectionStatus');
 const iceStatus = document.getElementById('iceStatus');
 const messageInput = document.getElementById('messageInput');
 const sendMessageBtn = document.getElementById('sendMessageBtn');
-const messagesContainer = document.getElementById('messagesContainer');
+const chatMessages = document.getElementById('chatMessages');
+
+// Debug: Check if critical elements exist
+if (!chatMessages) {
+    console.error('Critical error: chatMessages element not found');
+}
+if (!messageInput) {
+    console.error('Critical error: messageInput element not found');
+}
+if (!sendMessageBtn) {
+    console.error('Critical error: sendMessageBtn element not found');
+}
 
 // --- State ---
 let localStream = null;
@@ -48,9 +66,20 @@ hangupBtn.addEventListener('click', hangUp);
 muteBtn.addEventListener('click', toggleAudio);
 videoBtn.addEventListener('click', toggleVideo);
 copyOfferBtn.addEventListener('click', copyOffer);
+copyAnswerBtn.addEventListener('click', copyAnswer);
+copyOfferInputBtn.addEventListener('click', copyOfferInput);
+pasteAnswerBtn.addEventListener('click', pasteAnswer);
+pasteOfferInputBtn.addEventListener('click', pasteOfferInput);
 setAnswerBtn.addEventListener('click', setAnswer);
 answerBtn.addEventListener('click', answerCall);
 sendMessageBtn.addEventListener('click', sendMessage);
+
+// Add Enter key support for sending messages
+messageInput.addEventListener('keypress', (event) => {
+    if (event.key === 'Enter' && !messageInput.disabled) {
+        sendMessage();
+    }
+});
 
 // --- UI Functions ---
 function updateStatus(elementId, status) {
@@ -99,11 +128,15 @@ function updateIceStatus() {
 }
 
 function addMessageToChat(message, isLocal = false) {
+    if (!chatMessages) {
+        console.error('chatMessages element not found');
+        return;
+    }
     const messageElement = document.createElement('div');
     messageElement.className = isLocal ? 'message local' : 'message remote';
     messageElement.textContent = message;
-    messagesContainer.appendChild(messageElement);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    chatMessages.appendChild(messageElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // --- Camera & Media ---
@@ -166,19 +199,43 @@ function createPeerConnection() {
     peerConnection.onconnectionstatechange = updateConnectionStatus;
     peerConnection.oniceconnectionstatechange = updateIceStatus;
 
-    // Create a data channel for messaging
-    dataChannel = peerConnection.createDataChannel("chat");
+    // Handle incoming data channels (for the answerer)
+    peerConnection.ondatachannel = (event) => {
+        const channel = event.channel;
+        setupDataChannel(channel);
+    };
 
+    // Create a data channel for messaging (for the caller)
+    dataChannel = peerConnection.createDataChannel("chat");
+    setupDataChannel(dataChannel);
+
+    updateStatus('connectionStatus', 'connecting');
+}
+
+// Helper function to setup data channel handlers
+function setupDataChannel(channel) {
+    dataChannel = channel; // Store reference to the channel
+    
     dataChannel.onopen = () => {
+        console.log('Data channel opened');
         messageInput.disabled = false; // Enable chat input
         sendMessageBtn.disabled = false; // Enable send button
     };
 
-    dataChannel.onmessage = (event) => {
-        addMessageToChat(event.data); // Display incoming messages
+    dataChannel.onclose = () => {
+        console.log('Data channel closed');
+        messageInput.disabled = true; // Disable chat input
+        sendMessageBtn.disabled = true; // Disable send button
     };
 
-    updateStatus('connectionStatus', 'connecting');
+    dataChannel.onerror = (error) => {
+        console.error('Data channel error:', error);
+    };
+
+    dataChannel.onmessage = (event) => {
+        console.log('Received message:', event.data);
+        addMessageToChat(event.data, false); // Display incoming messages (not local)
+    };
 }
 
 async function createCall() {
@@ -233,6 +290,10 @@ async function setAnswer() {
 }
 
 function hangUp() {
+    if (dataChannel) {
+        dataChannel.close();
+        dataChannel = null;
+    }
     if (peerConnection) {
         peerConnection.close();
         peerConnection = null;
@@ -252,6 +313,8 @@ function hangUp() {
     muteBtn.disabled = true;
     videoBtn.disabled = true;
     copyOfferBtn.disabled = true;
+    messageInput.disabled = true;
+    sendMessageBtn.disabled = true;
     setAnswerBtn.disabled = false;
     answerBtn.disabled = false;
     offerText.value = '';
@@ -292,26 +355,145 @@ function waitForIceGathering() {
     });
 }
 
-async function copyOffer() {
+// Enhanced clipboard functions with better cross-platform support
+async function copyToClipboard(text, buttonElement, successText, defaultText) {
     try {
-        await navigator.clipboard.writeText(offerText.value);
-        copyOfferBtn.textContent = 'Copied!';
-        setTimeout(() => {
-            copyOfferBtn.textContent = 'Copy Offer';
-        }, 2000);
+        // Check if clipboard API is available
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            buttonElement.textContent = successText;
+            setTimeout(() => {
+                buttonElement.textContent = defaultText;
+            }, 2000);
+        } else {
+            throw new Error('Clipboard API not available');
+        }
     } catch (error) {
-        offerText.select();
-        document.execCommand('copy');
+        // Fallback for older browsers or insecure contexts
+        try {
+            // Create a temporary textarea element
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            // Try to copy using execCommand
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            if (successful) {
+                buttonElement.textContent = successText;
+                setTimeout(() => {
+                    buttonElement.textContent = defaultText;
+                }, 2000);
+            } else {
+                throw new Error('Copy failed');
+            }
+        } catch (fallbackError) {
+            // Final fallback - show text for manual copy
+            alert(`Copy failed. Please manually copy this text:\n\n${text}`);
+            buttonElement.textContent = 'Copy Failed';
+            setTimeout(() => {
+                buttonElement.textContent = defaultText;
+            }, 3000);
+        }
     }
+}
+
+async function pasteFromClipboard(targetElement, buttonElement, successText, defaultText) {
+    try {
+        // Check if clipboard API is available
+        if (navigator.clipboard && window.isSecureContext) {
+            const text = await navigator.clipboard.readText();
+            targetElement.value = text;
+            buttonElement.textContent = successText;
+            setTimeout(() => {
+                buttonElement.textContent = defaultText;
+            }, 2000);
+        } else {
+            throw new Error('Clipboard API not available');
+        }
+    } catch (error) {
+        // Fallback for older browsers or mobile
+        targetElement.focus();
+        targetElement.select();
+        
+        // Show instructions based on platform
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isMac = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+        
+        let instruction;
+        if (isMobile) {
+            instruction = 'Tap and hold, then select "Paste"';
+        } else if (isMac) {
+            instruction = 'Press Cmd+V to paste';
+        } else {
+            instruction = 'Press Ctrl+V to paste';
+        }
+        
+        buttonElement.textContent = instruction;
+        setTimeout(() => {
+            buttonElement.textContent = defaultText;
+        }, 4000);
+    }
+}
+
+async function copyOffer() {
+    if (!offerText.value.trim()) {
+        alert('Offer textarea is empty. Nothing to copy.');
+        return;
+    }
+    await copyToClipboard(offerText.value, copyOfferBtn, 'Copied!', 'Copy Offer');
+}
+
+async function copyAnswer() {
+    if (!answerText.value.trim()) {
+        alert('Answer textarea is empty. Nothing to copy.');
+        return;
+    }
+    await copyToClipboard(answerText.value, copyAnswerBtn, 'Copied!', 'Copy Answer');
+}
+
+async function copyOfferInput() {
+    if (!offerInput.value.trim()) {
+        alert('Offer input textarea is empty. Nothing to copy.');
+        return;
+    }
+    await copyToClipboard(offerInput.value, copyOfferInputBtn, 'Copied!', 'Copy Offer');
+}
+
+async function pasteAnswer() {
+    await pasteFromClipboard(answerText, pasteAnswerBtn, 'Pasted!', 'Paste Answer');
+}
+
+async function pasteOfferInput() {
+    await pasteFromClipboard(offerInput, pasteOfferInputBtn, 'Pasted!', 'Paste Offer');
 }
 
 function sendMessage() {
     const message = messageInput.value.trim();
-    if (message !== '' && peerConnection) {
-        // Send message to the other peer
-        dataChannel.send(message); // Use the data channel to send the message
-        addMessageToChat(message, true); // Display the message in the chat
-        messageInput.value = '';
+    if (message !== '') {
+        if (dataChannel && dataChannel.readyState === 'open') {
+            try {
+                // Send message to the other peer via data channel
+                dataChannel.send(message);
+                console.log('Sent message:', message);
+                addMessageToChat(message, true); // Display the message in the chat (sent)
+            } catch (error) {
+                console.error('Failed to send message:', error);
+                addMessageToChat("Failed to send message", false);
+            }
+        } else {
+            console.log('Data channel not ready. State:', dataChannel ? dataChannel.readyState : 'null');
+            // For testing purposes or when no peer connection exists
+            addMessageToChat(message, true); // Display the message locally
+            addMessageToChat("(No peer connected - message sent locally only)", false);
+        }
+        messageInput.value = ''; // Clear the input field
     }
 }
 

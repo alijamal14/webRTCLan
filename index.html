@@ -54,13 +54,21 @@
             <div class="signaling-group">
                 <label for="answerText"><strong>2. Paste their answer here:</strong></label>
                 <textarea id="answerText" placeholder="Paste the answer from the other person here..."></textarea>
-                <button id="setAnswerBtn" class="btn-success signaling-button">Set Answer</button>
+                <div class="signaling-button-group">
+                    <button id="pasteAnswerBtn" class="btn-warning signaling-button">Paste Answer</button>
+                    <button id="copyAnswerBtn" class="btn-primary signaling-button">Copy Answer</button>
+                    <button id="setAnswerBtn" class="btn-success signaling-button">Set Answer</button>
+                </div>
             </div>
 
             <div>
                 <label for="offerInput"><strong>3. Or paste their offer here (if you're answering):</strong></label>
                 <textarea id="offerInput" placeholder="Paste the offer from the other person here..."></textarea>
-                <button id="answerBtn" class="btn-success signaling-button">Answer Call</button>
+                <div class="signaling-button-group">
+                    <button id="pasteOfferInputBtn" class="btn-warning signaling-button">Paste Offer</button>
+                    <button id="copyOfferInputBtn" class="btn-primary signaling-button">Copy Offer</button>
+                    <button id="answerBtn" class="btn-success signaling-button">Answer Call</button>
+                </div>
             </div>
         </div>
 
@@ -101,15 +109,15 @@
             </div>
 
             <div class="chat-input">
-                <input id="messageInput" type="text" placeholder="Type your message here..." disabled>
-                <button id="sendMessageBtn" class="btn-send" disabled>Send</button>
+                <input id="messageInput" type="text" placeholder="Type your message here...">
+                <button id="sendMessageBtn" class="btn-send">Send</button>
             </div>
         </div>
 
         <div id="buildNumberDisplay"></div>
     </div>
 
-        <script src="webrtc.js"></script>
+        <script src="webrtc.js?v=20250917b"></script>
         <script>
         // Light/Dark mode toggle logic (dark is default)
         const darkModeToggle = document.getElementById('darkModeToggle');
