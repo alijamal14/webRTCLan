@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebRTC P2P LAN Demo</title>
     <meta name="build-number" content="1.0.1">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📹</text></svg>">
     <link rel="stylesheet" href="css/base.css">
 </head>
 <body>
@@ -43,31 +44,20 @@
         </div>
 
         <div class="signaling-section">
-            <h3>Signaling (Copy & Paste)</h3>
+            <h3>Connect to Another Device</h3>
             
             <div class="signaling-group">
-                <label for="offerText"><strong>1. Share this offer with the other person:</strong></label>
-                <textarea id="offerText" placeholder="Your call offer will appear here..." readonly></textarea>
-                <button id="copyOfferBtn" class="btn-primary signaling-button" disabled>Copy Offer</button>
+                <label for="callCodeText"><strong>Share this call code:</strong></label>
+                <textarea id="callCodeText" placeholder="Click 'Create Call' to generate your call code..." readonly></textarea>
+                <button id="copyCallCodeBtn" class="btn-primary signaling-button" disabled>📋 Copy Call Code</button>
             </div>
 
             <div class="signaling-group">
-                <label for="answerText"><strong>2. Paste their answer here:</strong></label>
-                <textarea id="answerText" placeholder="Paste the answer from the other person here..."></textarea>
+                <label for="joinCodeInput"><strong>Paste call code here:</strong></label>
+                <textarea id="joinCodeInput" placeholder="Paste a call code here to join a call or send an answer..."></textarea>
                 <div class="signaling-button-group">
-                    <button id="pasteAnswerBtn" class="btn-warning signaling-button">Paste Answer</button>
-                    <button id="copyAnswerBtn" class="btn-primary signaling-button">Copy Answer</button>
-                    <button id="setAnswerBtn" class="btn-success signaling-button">Set Answer</button>
-                </div>
-            </div>
-
-            <div>
-                <label for="offerInput"><strong>3. Or paste their offer here (if you're answering):</strong></label>
-                <textarea id="offerInput" placeholder="Paste the offer from the other person here..."></textarea>
-                <div class="signaling-button-group">
-                    <button id="pasteOfferInputBtn" class="btn-warning signaling-button">Paste Offer</button>
-                    <button id="copyOfferInputBtn" class="btn-primary signaling-button">Copy Offer</button>
-                    <button id="answerBtn" class="btn-success signaling-button">Answer Call</button>
+                    <button id="pasteJoinCodeBtn" class="btn-warning signaling-button">📋 Paste</button>
+                    <button id="joinCallBtn" class="btn-success signaling-button">� Process Code</button>
                 </div>
             </div>
         </div>
@@ -89,14 +79,14 @@
         </div>
 
         <div class="instructions">
-            <h4>How to use on LAN:</h4>
+            <h4>How to connect two devices:</h4>
             <ol>
-                <li>Open this page on two different devices on the same network</li>
+                <li>Open this page on two different devices</li>
                 <li>On both devices, click "Start Camera"</li>
-                <li>On one device, click "Create Call" and copy the offer</li>
-                <li>Paste the offer on the other device and click "Answer Call"</li>
-                <li>Copy the answer from the second device</li>
-                <li>Paste the answer on the first device and click "Set Answer"</li>
+                <li><strong>Person A:</strong> Click "Create Call" and share the call code with Person B</li>
+                <li><strong>Person B:</strong> Paste the call code and click "Process Code" to join</li>
+                <li><strong>Person B:</strong> Copy the answer code and send it back to Person A</li>
+                <li><strong>Person A:</strong> Paste the answer code and click "Process Code"</li>
                 <li>You should now be connected!</li>
             </ol>
         </div>
@@ -117,7 +107,7 @@
         <div id="buildNumberDisplay"></div>
     </div>
 
-        <script src="webrtc.js?v=20250917b"></script>
+        <script src="webrtc.js?v=simplified-signaling"></script>
         <script>
         // Light/Dark mode toggle logic (dark is default)
         const darkModeToggle = document.getElementById('darkModeToggle');

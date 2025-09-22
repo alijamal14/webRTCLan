@@ -15,16 +15,11 @@ const callBtn = document.getElementById('callBtn');
 const hangupBtn = document.getElementById('hangupBtn');
 const muteBtn = document.getElementById('muteBtn');
 const videoBtn = document.getElementById('videoBtn');
-const offerText = document.getElementById('offerText');
-const answerText = document.getElementById('answerText');
-const offerInput = document.getElementById('offerInput');
-const copyOfferBtn = document.getElementById('copyOfferBtn');
-const copyAnswerBtn = document.getElementById('copyAnswerBtn');
-const copyOfferInputBtn = document.getElementById('copyOfferInputBtn');
-const pasteAnswerBtn = document.getElementById('pasteAnswerBtn');
-const pasteOfferInputBtn = document.getElementById('pasteOfferInputBtn');
-const setAnswerBtn = document.getElementById('setAnswerBtn');
-const answerBtn = document.getElementById('answerBtn');
+const callCodeText = document.getElementById('callCodeText');
+const joinCodeInput = document.getElementById('joinCodeInput');
+const copyCallCodeBtn = document.getElementById('copyCallCodeBtn');
+const pasteJoinCodeBtn = document.getElementById('pasteJoinCodeBtn');
+const joinCallBtn = document.getElementById('joinCallBtn');
 const cameraStatus = document.getElementById('cameraStatus');
 const connectionStatus = document.getElementById('connectionStatus');
 const iceStatus = document.getElementById('iceStatus');
@@ -42,6 +37,21 @@ if (!messageInput) {
 if (!sendMessageBtn) {
     console.error('Critical error: sendMessageBtn element not found');
 }
+if (!callCodeText) {
+    console.error('Critical error: callCodeText element not found');
+}
+if (!copyCallCodeBtn) {
+    console.error('Critical error: copyCallCodeBtn element not found');
+}
+if (!joinCodeInput) {
+    console.error('Critical error: joinCodeInput element not found');
+}
+if (!pasteJoinCodeBtn) {
+    console.error('Critical error: pasteJoinCodeBtn element not found');
+}
+if (!joinCallBtn) {
+    console.error('Critical error: joinCallBtn element not found');
+}
 
 // --- State ---
 let localStream = null;
@@ -50,6 +60,7 @@ let peerConnection = null;
 let isAudioMuted = false;
 let isVideoDisabled = false;
 let dataChannel; // Declare dataChannel in a broader scope
+let isAnswerer = false; // Track if this peer is answering a call
 
 // --- WebRTC Config ---
 const configuration = {
@@ -65,13 +76,9 @@ callBtn.addEventListener('click', createCall);
 hangupBtn.addEventListener('click', hangUp);
 muteBtn.addEventListener('click', toggleAudio);
 videoBtn.addEventListener('click', toggleVideo);
-copyOfferBtn.addEventListener('click', copyOffer);
-copyAnswerBtn.addEventListener('click', copyAnswer);
-copyOfferInputBtn.addEventListener('click', copyOfferInput);
-pasteAnswerBtn.addEventListener('click', pasteAnswer);
-pasteOfferInputBtn.addEventListener('click', pasteOfferInput);
-setAnswerBtn.addEventListener('click', setAnswer);
-answerBtn.addEventListener('click', answerCall);
+copyCallCodeBtn.addEventListener('click', copyCallCode);
+pasteJoinCodeBtn.addEventListener('click', pasteJoinCode);
+joinCallBtn.addEventListener('click', joinCall);
 sendMessageBtn.addEventListener('click', sendMessage);
 
 // Add Enter key support for sending messages
@@ -142,17 +149,21 @@ function addMessageToChat(message, isLocal = false) {
 // --- Camera & Media ---
 async function startCamera() {
     try {
+        console.log('Requesting camera and microphone access...');
         localStream = await navigator.mediaDevices.getUserMedia({
             video: { width: 640, height: 480 },
             audio: true
         });
+        console.log('Camera and microphone access granted successfully');
         localVideo.srcObject = localStream;
         startBtn.disabled = true;
         callBtn.disabled = false;
         muteBtn.disabled = false;
         videoBtn.disabled = false;
         updateStatus('cameraStatus', 'connected');
+        console.log('Camera started successfully');
     } catch (error) {
+        console.error('Camera error:', error);
         alert('Could not access camera and microphone. Please check permissions.');
     }
 }
@@ -251,41 +262,88 @@ async function createCall() {
         });
         await peerConnection.setLocalDescription(offer);
         await waitForIceGathering();
-        offerText.value = JSON.stringify(peerConnection.localDescription, null, 2);
-        copyOfferBtn.disabled = false;
+        
+        // Create a call code that contains the offer and indicates this peer is the caller
+        const callCode = {
+            type: 'offer',
+            data: peerConnection.localDescription,
+            timestamp: Date.now()
+        };
+        
+        callCodeText.value = JSON.stringify(callCode, null, 2);
+        copyCallCodeBtn.disabled = false;
         callBtn.disabled = true;
         hangupBtn.disabled = false;
+        
+        // Auto-copy the call code for convenience
+        await copyCallCode();
+        
+        // Update UI to show we're waiting for someone to join
+        callCodeText.placeholder = "Waiting for someone to join your call...";
+        
     } catch (error) {
         alert('Error creating call: ' + error.message);
     }
 }
 
-async function answerCall() {
+async function joinCall() {
     try {
-        const offerData = JSON.parse(offerInput.value.trim());
-        createPeerConnection();
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(offerData));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        await waitForIceGathering();
-        answerText.value = JSON.stringify(peerConnection.localDescription, null, 2);
-        callBtn.disabled = true;
-        hangupBtn.disabled = false;
-        answerBtn.disabled = true;
-        offerInput.value = '';
+        const callCode = joinCodeInput.value.trim();
+        if (!callCode) {
+            alert('Please paste a call code first.');
+            return;
+        }
+        
+        let callData;
+        try {
+            callData = JSON.parse(callCode);
+        } catch (e) {
+            alert('Invalid call code format. Please check and try again.');
+            return;
+        }
+        
+        if (callData.type === 'offer') {
+            // This is an offer, so we need to answer it
+            isAnswerer = true;
+            createPeerConnection();
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(callData.data));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            await waitForIceGathering();
+            
+            // Create answer code for the caller to use
+            const answerCode = {
+                type: 'answer',
+                data: peerConnection.localDescription,
+                timestamp: Date.now()
+            };
+            
+            // Put the answer code in the input field so user can copy it
+            joinCodeInput.value = JSON.stringify(answerCode, null, 2);
+            
+            callBtn.disabled = true;
+            hangupBtn.disabled = false;
+            joinCallBtn.disabled = true;
+            
+            alert('Call joined! Copy the answer code from the text field and send it back to the caller.');
+            
+        } else if (callData.type === 'answer') {
+            // This is an answer to our call
+            if (!peerConnection || peerConnection.signalingState === 'closed') {
+                alert('No active call to receive this answer. Please create a call first.');
+                return;
+            }
+            
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(callData.data));
+            joinCodeInput.value = '';
+            alert('Answer received! Connection should be established shortly.');
+        } else {
+            alert('Unknown call code type. Please check the code and try again.');
+        }
+        
     } catch (error) {
-        alert('Error answering call. Please check the offer format.');
-    }
-}
-
-async function setAnswer() {
-    try {
-        const answerData = JSON.parse(answerText.value.trim());
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answerData));
-        setAnswerBtn.disabled = true;
-        answerText.value = '';
-    } catch (error) {
-        alert('Error setting answer. Please check the answer format.');
+        alert('Error processing call code: ' + error.message);
+        console.error('Join call error:', error);
     }
 }
 
@@ -312,19 +370,18 @@ function hangUp() {
     hangupBtn.disabled = true;
     muteBtn.disabled = true;
     videoBtn.disabled = true;
-    copyOfferBtn.disabled = true;
+    copyCallCodeBtn.disabled = true;
     messageInput.disabled = true;
     sendMessageBtn.disabled = true;
-    setAnswerBtn.disabled = false;
-    answerBtn.disabled = false;
-    offerText.value = '';
-    answerText.value = '';
-    offerInput.value = '';
+    joinCallBtn.disabled = false;
+    callCodeText.value = '';
+    joinCodeInput.value = '';
     muteBtn.textContent = 'Mute Audio';
     videoBtn.textContent = 'Disable Video';
-    copyOfferBtn.textContent = 'Copy Offer';
+    copyCallCodeBtn.textContent = '📋 Copy Call Code';
     isAudioMuted = false;
     isVideoDisabled = false;
+    isAnswerer = false;
     updateStatus('cameraStatus', 'disconnected');
     updateStatus('connectionStatus', 'disconnected');
     updateStatus('iceStatus', 'disconnected');
@@ -442,36 +499,16 @@ async function pasteFromClipboard(targetElement, buttonElement, successText, def
     }
 }
 
-async function copyOffer() {
-    if (!offerText.value.trim()) {
-        alert('Offer textarea is empty. Nothing to copy.');
+async function copyCallCode() {
+    if (!callCodeText.value.trim()) {
+        alert('Call code is empty. Create a call first.');
         return;
     }
-    await copyToClipboard(offerText.value, copyOfferBtn, 'Copied!', 'Copy Offer');
+    await copyToClipboard(callCodeText.value, copyCallCodeBtn, '✅ Copied!', '📋 Copy Call Code');
 }
 
-async function copyAnswer() {
-    if (!answerText.value.trim()) {
-        alert('Answer textarea is empty. Nothing to copy.');
-        return;
-    }
-    await copyToClipboard(answerText.value, copyAnswerBtn, 'Copied!', 'Copy Answer');
-}
-
-async function copyOfferInput() {
-    if (!offerInput.value.trim()) {
-        alert('Offer input textarea is empty. Nothing to copy.');
-        return;
-    }
-    await copyToClipboard(offerInput.value, copyOfferInputBtn, 'Copied!', 'Copy Offer');
-}
-
-async function pasteAnswer() {
-    await pasteFromClipboard(answerText, pasteAnswerBtn, 'Pasted!', 'Paste Answer');
-}
-
-async function pasteOfferInput() {
-    await pasteFromClipboard(offerInput, pasteOfferInputBtn, 'Pasted!', 'Paste Offer');
+async function pasteJoinCode() {
+    await pasteFromClipboard(joinCodeInput, pasteJoinCodeBtn, '✅ Pasted!', '📋 Paste');
 }
 
 function sendMessage() {
